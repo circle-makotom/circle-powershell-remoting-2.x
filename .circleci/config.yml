@@ -1,0 +1,81 @@
+version: 2
+
+jobs:
+  # デプロイ先に展開するファイルを Linux 環境上でビルドする
+  build:
+    docker:
+      - image: debian:buster-slim
+    steps:
+      - checkout
+      - run:
+          name: ビルド (デモ用にここではテキスト ファイルを生成)
+          command: echo -e "Hello CircleCI and Windows!\n$(date)" | tee artefact.txt
+      # ビルド結果を artifact として保存し UI から確認できるようにする
+      - store_artifacts:
+          path: artefact.txt
+      # ビルド結果をワークスペースに保存しデプロイ ジョブで再利用できるようにする
+      - persist_to_workspace:
+          root: .
+          paths:
+            - artefact.txt
+
+  # Windows 環境の PowerShell を使用してリモート ホストにファイルをコピーしサービスを再起動
+  deploy:
+    machine:
+      image: windows-default
+    shell: powershell.exe
+    resource_class: windows.medium
+    steps:
+      - attach_workspace:
+          at: .
+      - run:
+          name: デプロイ
+
+          # ポータビリティのため今回は環境変数を直接ハードコード
+          # 理想的には contexts を使用するとよい
+          # 参考: https://circleci.com/docs/ja/2.0/contexts/
+          environment:
+            # 接続先
+            REMOTE_HOSTNAME: ec2-54-95-144-136.ap-northeast-1.compute.amazonaws.com
+            # ログオンするユーザー名 (デプロイ先の PowerShell で `Write-Host $env:COMPUTERNAME\$env:USERNAME` と実行することで確認可能)
+            REMOTE_USERNAME: EC2AMAZ-G4FA6JH\Administrator
+            # ログオンするユーザーのパスワード
+            REMOTE_PASSWORD: "q$!GYfR=X-6SO$(i7BCe3!EV=DmZQAVM"
+
+          # 以下実際に CircleCI で実行される PowerShell のコード
+          command: |
+            # PowerShell のリモート セッションを立ち上げる
+            # 接続先が 5986/tcp で HTTPS による WinRM の接続を許容する必要あり
+            # 同様に接続先が WinRM 接続時に NTLM (パスワード) ベースでの認証を許容する必要あり
+            # https://docs.microsoft.com/ja-jp/powershell/module/microsoft.powershell.core/about/about_remote_requirements?view=powershell-5.1
+            # 検証環境で WinRM を有効化するのにつかった参考用スクリプトはこちら https://gist.github.com/makotom/70fa58701fd06a383411bed3f8236767
+            $psCred = New-Object System.Management.Automation.PSCredential ($env:REMOTE_USERNAME, (ConvertTo-SecureString $env:REMOTE_PASSWORD -AsPlainText -Force))
+            $psSessionOpt = New-PSSessionOption -SkipCACheck -SkipCNCheck
+            $psSession = New-PSSession $env:REMOTE_HOSTNAME -Credential $psCred -SessionOption $psSessionOpt -UseSSL
+
+            # ファイル コピー
+            Copy-Item -Path artefact.txt -Destination C:\ -ToSession $psSession
+            # コピーするファイルが複数ある場合は上記を参考に `Copy-Item` コマンドを追加実行する
+
+            # コマンドのリモート実行
+            # ここではサンプルとして下記の 3 つのコマンドを実行
+            #   1) リモート ホストの Windows のバージョンを表示
+            #   2) 上記でコピーしたファイル C:\artefact.txt の中身を表示
+            #   3) C:\artefact.txt を C:\artefact.bak.txt に移動
+            Invoke-Command -Session $psSession {
+              [System.Environment]::OSVersion.Version | ft *
+              Get-Content C:\artefact.txt
+              Move-Item -Force C:\artefact.txt C:\artefact.bak.txt
+            }
+
+workflows:
+  version: 2
+
+  # ビルドのジョブとデプロイのジョブをワークフローでつなぐ
+  the-workflow:
+    jobs:
+      - build
+      - deploy:
+          # デプロイのジョブはビルドのジョブが完了してから実行する
+          requires:
+            - build
