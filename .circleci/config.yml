@@ -8,12 +8,12 @@ jobs:
     steps:
       - checkout
       - run:
-          name: ビルド (デモ用にここではテキスト ファイルを生成)
+          name: ビルド (デモ用にここではテキスト ファイル artefact.txt を生成)
           command: echo -e "Hello CircleCI and Windows!\n$(date)" | tee artefact.txt
-      # ビルド結果を artifact として保存し UI から確認できるようにする
+      # artefact.txt を artifact として保存し UI から確認できるようにする
       - store_artifacts:
           path: artefact.txt
-      # ビルド結果をワークスペースに保存しデプロイ ジョブで再利用できるようにする
+      # artefact.txt をワークスペースに保存しデプロイ ジョブで再利用できるようにする
       - persist_to_workspace:
           root: .
           paths:
@@ -36,7 +36,7 @@ jobs:
           # 参考: https://circleci.com/docs/ja/2.0/contexts/
           environment:
             # 接続先
-            REMOTE_HOSTNAME: ec2-35-72-34-250.ap-northeast-1.compute.amazonaws.com
+            REMOTE_HOSTNAME: ec2-3-112-81-7.ap-northeast-1.compute.amazonaws.com
             # ログオンするユーザー名 (デプロイ先の PowerShell で `Write-Host $env:COMPUTERNAME\$env:USERNAME` と実行することで確認可能)
             REMOTE_USERNAME: EC2AMAZ-5943922\Administrator
             # ログオンするユーザーのパスワード
@@ -53,27 +53,26 @@ jobs:
             $psSessionOpt = New-PSSessionOption -SkipCACheck -SkipCNCheck
             $psSession = New-PSSession $env:REMOTE_HOSTNAME -Credential $psCred -SessionOption $psSessionOpt -UseSSL
 
-            # ファイル コピー
-            Copy-Item -Path artefact.txt -Destination C:\ -ToSession $psSession
-            # コピーするファイルが複数ある場合は上記を参考に `Copy-Item` コマンドを追加実行する
-
-            # コマンドのリモート実行
-            # ここではサンプルとして下記の 3 つのコマンドを実行
-            #   1) リモート ホストの Windows のバージョンを表示
-            #   2) 上記でコピーしたファイル C:\artefact.txt の中身を表示
-            #   3) C:\artefact.txt を C:\artefact.bak.txt に移動
-            #   4) W32Time サービスを再起動
+            # コマンドのリモート実行 (1)
+            # サービスを停止する
             Invoke-Command -Session $psSession {
-              [System.Environment]::OSVersion.Version | ft *
-              Get-Content C:\artefact.txt
-              Move-Item -Force C:\artefact.txt C:\artefact.bak.txt
-
               # サンプル: W32Time サービスを停止する
               cmd.exe /c sc stop W32Time
               # サンプル: 5 秒待機
               Start-Sleep 5
+            }
+
+            # ファイル コピー (ここでは例としてビルド ジョブで作成した artefact.txt をコピー)
+            Copy-Item -Path artefact.txt -Destination C:\ -ToSession $psSession
+            # コピーするファイルが複数ある場合は上記を参考に `Copy-Item` コマンドを追加実行する
+
+            # コマンドのリモート実行 (2)
+            # サービスを再開する
+            Invoke-Command -Session $psSession {
               # サンプル: W32Time サービスを再開する
               cmd.exe /c sc start W32Time
+              # サンプル: 5 秒待機
+              Start-Sleep 5
             }
 
 workflows:
