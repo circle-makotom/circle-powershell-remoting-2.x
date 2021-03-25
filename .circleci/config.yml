@@ -36,7 +36,7 @@ jobs:
           # 参考: https://circleci.com/docs/ja/2.0/contexts/
           environment:
             # 接続先
-            REMOTE_HOSTNAME: ec2-13-115-172-244.ap-northeast-1.compute.amazonaws.com
+            REMOTE_HOSTNAME: ec2-35-72-34-250.ap-northeast-1.compute.amazonaws.com
             # ログオンするユーザー名 (デプロイ先の PowerShell で `Write-Host $env:COMPUTERNAME\$env:USERNAME` と実行することで確認可能)
             REMOTE_USERNAME: EC2AMAZ-5943922\Administrator
             # ログオンするユーザーのパスワード
@@ -62,10 +62,18 @@ jobs:
             #   1) リモート ホストの Windows のバージョンを表示
             #   2) 上記でコピーしたファイル C:\artefact.txt の中身を表示
             #   3) C:\artefact.txt を C:\artefact.bak.txt に移動
+            #   4) W32Time サービスを再起動
             Invoke-Command -Session $psSession {
               [System.Environment]::OSVersion.Version | ft *
               Get-Content C:\artefact.txt
               Move-Item -Force C:\artefact.txt C:\artefact.bak.txt
+
+              # サンプル: W32Time サービスを停止する
+              cmd.exe /c sc stop W32Time
+              # サンプル: 5 秒待機
+              Start-Sleep 5
+              # サンプル: W32Time サービスを再開する
+              cmd.exe /c sc start W32Time
             }
 
 workflows:
