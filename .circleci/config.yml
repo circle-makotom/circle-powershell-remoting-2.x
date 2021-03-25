@@ -4,7 +4,7 @@ jobs:
   # デプロイ先に展開するファイルを Linux 環境上でビルドする
   build:
     docker:
-      - image: debian:buster-slim
+      - image: cimg/base:stable
     steps:
       - checkout
       - run:
@@ -36,11 +36,11 @@ jobs:
           # 参考: https://circleci.com/docs/ja/2.0/contexts/
           environment:
             # 接続先
-            REMOTE_HOSTNAME: ec2-54-95-144-136.ap-northeast-1.compute.amazonaws.com
+            REMOTE_HOSTNAME: ec2-13-115-172-244.ap-northeast-1.compute.amazonaws.com
             # ログオンするユーザー名 (デプロイ先の PowerShell で `Write-Host $env:COMPUTERNAME\$env:USERNAME` と実行することで確認可能)
-            REMOTE_USERNAME: EC2AMAZ-G4FA6JH\Administrator
+            REMOTE_USERNAME: EC2AMAZ-5943922\Administrator
             # ログオンするユーザーのパスワード
-            REMOTE_PASSWORD: "q$!GYfR=X-6SO$(i7BCe3!EV=DmZQAVM"
+            REMOTE_PASSWORD: "dyo%ipDSD?O?rAB-.L8D5Pa(-mbPTR(H"
 
           # 以下実際に CircleCI で実行される PowerShell のコード
           command: |
